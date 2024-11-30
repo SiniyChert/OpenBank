@@ -5,16 +5,13 @@ from routers.users_router import router as userRouter
 from routers.credit_router import router as creditRouter
 from routers.transactions_router import router as transactionsRouter
 from routers.taxes_router import router as taxesRouter
-from classes import User
 
-
+    
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Жизненный цикл приложения. Всё до yield выполняется при запуске программы, всё что после - при завершении работы
     print("===APP SETUP===")
-    global pool
-    pool = dbr.connectionPool()
-    if pool is None:
+    if not dbr.connectToDB():
         print("db connection - failed")
     print("db connection - success")
     yield
@@ -27,9 +24,9 @@ app.include_router(creditRouter)
 app.include_router(transactionsRouter)
 app.include_router(taxesRouter)
 
+
 @app.get("/ping/")
 def ping():
     return {
         "responce": "pong",
     }
-

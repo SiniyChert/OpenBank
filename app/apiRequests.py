@@ -5,11 +5,11 @@ from datetime import datetime
 from classes import User, Transaction, Currency, Tax
 
 
-class ReqType:
+class ReqType(str):
     ping = "ping/"
 
 
-class getReqType(ReqType):
+class GetReqType(ReqType):
     getUser = "/users"
     findUser = "/users/find"
     getTransactionsPage = "/transactions"
@@ -21,9 +21,9 @@ class getReqType(ReqType):
     getCreditRequest = "/credits/{}"
 
 
-class postReqType(ReqType):
-    setUserStats = "/users/{}"
-    userTransaction = "/transactions"
+class PostReqType(ReqType):
+    setUserStats = "/users/{}/stats"
+    postTransaction = "/transactions"
     newTax = "/taxes"
     editTax = "/taxes/{}"
     newTaxPayment = "/taxes/payments"
@@ -31,22 +31,30 @@ class postReqType(ReqType):
     setCreditRequestStatus = "/credits/{}"
 
 
-def baseGetRequest(type: getReqType | None, params: dict | None) -> dict | None:
+def baseGetRequest(
+    path: GetReqType | None,
+    pathParams: list | None = None,
+    queryParams: dict | None = None,
+) -> dict | None:
     try:
-        reqRes = rq.get(config.API_PATH + type, params)
-    except Exception:
-        return None  # TODO logging
-    deserRes = json.loads(reqRes.content)  # десериализованный результат
-    return deserRes
-
-
-def basePostRequest(type: postReqType | None, params: dict | None) -> dict | None:
-    try:
-        reqRes = rq.post(config.API_PATH + type, params)
+        reqRes = rq.get(config.API_PATH + path.format(pathParams), queryParams)
     except Exception:
         return None  # TODO logging
     if reqRes.status_code != 200:
         return None
+    deserRes = json.loads(reqRes.content)  # десериализованный результат
+    return deserRes
+
+
+def basePostRequest(
+    path: GetReqType | None,
+    pathParams: list | None = None,
+    queryParams: dict | None = None,
+) -> dict | None:
+    try:
+        reqRes = rq.post(config.API_PATH + path.format(pathParams), queryParams)
+    except Exception:
+        return None  # TODO logging
     deserRes = json.loads(reqRes.content)  # десериализованный результат
     return deserRes
 
@@ -72,8 +80,8 @@ def getUser(
         При ошибке выполнения функции возвращает None (напр. передано несколько критериев)
     """
     res = baseGetRequest(
-        getReqType.getUser,
-        {
+        GetReqType.getUser,
+        queryParams={
             "id": id,
             "username": username,
             "FIO": FIO,
@@ -84,7 +92,7 @@ def getUser(
     return None
 
 
-def findUser(pattern: str) -> list[User] | None:
+def findUser(pattern: str) -> list[User]:
     """Поиск имён пользователей и ФИО в базе данных, похожих на паттерн. Длина патерна должна быть больше 3 символов.
 
     Args:
@@ -95,51 +103,17 @@ def findUser(pattern: str) -> list[User] | None:
     """
     if len(pattern) < 3:
         return None
-    finded = baseGetRequest(getReqType.findUser, {"pattern": pattern})
-    res = []
-    for i in finded:
-        res.append(User(**i))
-    if res:
-        return res
+    finded = baseGetRequest(GetReqType.findUser, queryParams={"pattern": pattern})
+    if finded is not None:
+        return [User(**i) for i in finded]
     return None
 
 
-def postTransaction(
-    sender: str, recipient: str, sum: Currency, forced: bool = False
-) -> int:
-    """Транзакция между 2 пользователями
-
-    Args:
-        sender (str): отправитель
-        recipient (str): получатель
-        sum (Currency): сумма перевода
-    Returns:
-        int: Код завршения
-        0 - успешно,
-        1 - ошибка
-    """
-    pass
-
-
-def getTransactionsPage(username: str, i: int) -> tuple[Transaction] | None:
-    """Возвращает i-ую страницу истории транзакций пользователя.
-    i >= 0. Каждая страница содержит 15 транзакций.
-
-    Args:
-        username (str): имя пользователя
-        i (int): индекс нужной страницы
-
-    Returns:
-
-    """
-    pass
-
-
-def getTaxes() -> tuple[Tax] | None:
+def getTaxes() -> list[Tax]:
     """Возвращает всю информацию о существующих налогах.
 
     Returns:
-        tuple[Tax] | None: налог, если запрос успешен, иначе None
+        list[Tax] | None: налог, если запрос успешен, иначе None
     """
     pass
 
@@ -243,8 +217,40 @@ def setCreditRequestStatus(id, status):
     pass
 
 
-if __name__ == "__main__":
-    r = findUser("лек")
+def postTransaction(
+    sender: str, recipient: str, sum: Currency, forced: bool = False
+) -> int:
+    """Транзакция между 2 пользователями. Если на счету отправителя недостаточно средств, транзакция будет отменена. Принудитетльная транзакция игнорирует это ограничения, но счёт отправителя может стать отрицательным.
 
-    for i in r:
-        print(i)
+    Args:
+        sender (str): отправитель
+        recipient (str): получатель
+        sum (Currency): сумма перевода
+        forced (bool): принудительная ли
+    Returns:
+        int: Код завршения
+        0 - успешно,
+        1 - ошибка
+    """
+    pass
+
+
+def getTransactionsPage(username: str, i: int) -> tuple[Transaction] | None:
+    """Возвращает i-ую страницу истории транзакций пользователя.
+    i >= 0. Каждая страница содержит 15 транзакций.
+
+    Args:
+        username (str): имя пользователя
+        i (int): индекс нужной страницы
+
+    Returns:
+
+    """
+    pass
+
+
+if __name__ == "__main__":
+    timeStart = datetime.now()
+    r = getUser(id=2)
+    timeEnd = datetime.now()
+    print(r, timeEnd - timeStart)

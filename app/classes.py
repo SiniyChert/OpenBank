@@ -13,6 +13,7 @@ class Entry:
     def __str__(self):
         return str(self.__dict__)
 
+
 class User(Entry):
     def __init__(
         self,
@@ -55,11 +56,11 @@ class TaxPayment(Entry):
 
 
 class Tax(Entry):
-    def __init__(self, Id: int, sum: Currency, datetime: datetime, name: str):
+    def __init__(self, Id: int, name: str, datetime: datetime, sum: Currency):
         self.Id = Id
-        self.sum = sum
-        self.datetime = datetime
         self.name = name
+        self.datetime = datetime
+        self.sum = sum
 
 
 class CreditRequest(Entry):
