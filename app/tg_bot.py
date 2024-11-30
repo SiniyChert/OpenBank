@@ -1,45 +1,35 @@
-# Тут пиши тг бота. В api пиши запросы, которые понадобятся для реализации функционала бота
-# В config.py все
-
-import apiRequests as ar
-from config import TELEGRAM_API_KEY
+import sqlite3
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler
 
-# add some usefull code
+# Подключение к базе данных
+conn = sqlite3.connect('database.db')
+cursor = conn.cursor()
 
-# Файл с именами администраторов
-ADMINS_FILE = 'admins.txt'
-# Файл с именами участников
-PARTICIPANTS_FILE = 'participants.txt'
+# Создание таблицы users, если она еще не существует
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username VARCHAR UNIQUE,
+    isOrg BOOLEAN DEFAULT FALSE
+)
+''')
+conn.commit()
 
-def read_usernames_from_file(filename):
-    with open(filename, 'r') as file:
-        return set(file.read().splitlines())
-
-# Чтение списков администраторов и участников
-admins = read_usernames_from_file(ADMINS_FILE)
-participants = read_usernames_from_file(PARTICIPANTS_FILE)
+# Функция проверки роли пользователя
+def check_role(username):
+    cursor.execute('SELECT isOrg FROM users WHERE username = ?', (username,))
+    result = cursor.fetchone()
+    if result is None:
+        return False  # Пользователь не найден
+    return bool(result[0])
 
 # Стартовая функция для всех пользователей
 def start(update: Update, context: CallbackContext):
     user = update.message.from_user.username
     
-    if user in participants:
-        # Сообщение для участников
-        keyboard = [
-            [InlineKeyboardButton('Перевод', callback_data='transfer'),
-             InlineKeyboardButton('История', callback_data='history'),
-             InlineKeyboardButton('Оформить кредит', callback_data='credit')]
-        ]
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        update.message.reply_text(
-            'Вас приветствует банк планеты завтра.\nСледующий налог будет {{date, time, sum}}\nВаш баланс: {{balance}}',
-            reply_markup=reply_markup
-        )
-    elif user in admins:
-        # Сообщение для администраторов
+    if check_role(user):
+        # Сообщение для организаторов
         keyboard = [
             [InlineKeyboardButton('Налоги', callback_data='taxes'),
              InlineKeyboardButton('Перевод', callback_data='transfer_admin'),
@@ -56,7 +46,18 @@ def start(update: Update, context: CallbackContext):
             reply_markup=reply_markup
         )
     else:
-        update.message.reply_text('Вы не зарегистрированы.')
+        # Сообщение для обычных пользователей
+        keyboard = [
+            [InlineKeyboardButton('Перевод', callback_data='transfer'),
+             InlineKeyboardButton('История', callback_data='history'),
+             InlineKeyboardButton('Оформить кредит', callback_data='credit')]
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        update.message.reply_text(
+            'Вас приветствует банк планеты завтра.\nСледующий налог будет {{date, time, sum}}\nВаш баланс: {{balance}}',
+            reply_markup=reply_markup
+        )
 
 # Обработка нажатия на кнопки для участников
 def button_handler(update: Update, context: CallbackContext):
@@ -69,7 +70,7 @@ def button_handler(update: Update, context: CallbackContext):
         context.user_data['action'] = 'transfer_username'
     elif data == 'history':
         query.edit_message_text(text="Ваша история")
-        # Здесь нужно добавить логику для чтения истории из файла
+        # Здесь нужно добавить логику для чтения истории из базы данных
     elif data == 'credit':
         query.edit_message_text(text="На какую сумму хотите оформить кредит?")
         context.user_data['action'] = 'apply_credit_amount'
@@ -83,7 +84,7 @@ def message_handler(update: Update, context: CallbackContext):
     
     if action == 'transfer_username':
         recipient = text
-        if recipient not in participants:
+        if not check_role(recipient):
             update.message.reply_text("Ошибка: такого пользователя нет.")
         else:
             update.message.reply_text("Введите сумму перевода")
@@ -107,7 +108,7 @@ def message_handler(update: Update, context: CallbackContext):
         apply_for_credit(user, context.user_data['credit_amount'], reason)  # Логика оформления кредита
         update.message.reply_text("Ожидайте рассмотрения вашей заявки.")
 
-# Логика для администратора
+# Логика для организатора
 def admin_button_handler(update: Update, context: CallbackContext):
     query = update.callback_query
     data = query.data
@@ -128,7 +129,7 @@ def admin_button_handler(update: Update, context: CallbackContext):
         query.edit_message_text(text="test_я в рот ебла пока не ебу как все подключить")
 
 def main():
-    updater = Updater(token=TELEGRAM_API_KEY, use_context=True)
+    updater = Updater(token='7675020905:AAHaqf7EJqA2FUlIBQU_cD76tMeu-exHLuM', use_context=True)
     
     dp = updater.dispatcher
     
